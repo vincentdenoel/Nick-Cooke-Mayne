@@ -1,5 +1,5 @@
 import numpy as np
-from wind_psd import wind_psd
+from SSDpy.wind.wind_psd import wind_psd
 from SSDpy.dyn import EOMsolvers as solvers
 
 def gen_sample(typ, T=6000):
