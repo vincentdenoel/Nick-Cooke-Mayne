@@ -1,11 +1,25 @@
 import numpy as np
 
-def sample_blocks(x, block_size, random = False, circular=True, step=None, func=lambda x: x):
+def safe_block_gather(x, start_idxs, block_size, func = lambda x: x, chunk_size=10):
+    results = []
+    n_dims = len(x.shape)
+    for i in range(0, len(start_idxs), chunk_size):
+        if i + chunk_size > len(start_idxs):
+            chunk = start_idxs[i:]
+        else:
+            chunk = start_idxs[i:i+chunk_size]
+        block_idxs = chunk[:, None] + np.arange(block_size)
+        # blocks_chunk = x[..., block_idxs]  # (..., chunk_size, block_size)
+        blocks_chunk = np.take(x, block_idxs, axis=-1)
+        results.append(func(blocks_chunk))
+    return np.concatenate(results, axis=n_dims-1)
+
+def sample_blocks(x, block_size, random=False, circular=True, step=None, func=lambda x: x, chunk_size=10):
     """
-    Split data into disjoint blocks of a given size.
+    Vectorized block sampling along the last axis of an n-D array.
     
     Arguments:
-    - x: 1D array
+    - x: np.ndarray of shape (T, ...)
     - block_size: int, size of each block
 
     Keyword arguments:
@@ -15,7 +29,7 @@ def sample_blocks(x, block_size, random = False, circular=True, step=None, func=
     - func: function to apply to each block (default is identity function)
     
     Returns:
-    - List of 1D numpy arrays, each of size block_size. If func is not identity, the list is instead the result of applying func to each block.
+    - Blocks of shape (..., num_blocks, block_size), or result of applying func
 
     Example usage:
     - Sliding Block: random=False, step=1
@@ -24,27 +38,31 @@ def sample_blocks(x, block_size, random = False, circular=True, step=None, func=
     - Random Blocks (N blocks): random=True, step=len(x)/N
     """
     x = np.asarray(x)
-    n = len(x)
+    T = x.shape[-1]
+    
+    if T % block_size != 0:
+        raise ValueError("Length of data must be divisible by block_size.")
+    
     if step is None:
         step = block_size
     step = int(step)
-    block_size = int(block_size)
-    if len(x) % block_size != 0:
-        raise ValueError("Length of data must be divisible by block_size.")
-    if circular:
-        x = np.concatenate([x, x[:block_size-1]])
-    else:
-        n += 1 - block_size
-    if random:
-        sample_size = n // step
-        indices = np.random.randint(0, n, sample_size)[:, None]
-    else:
-        indices = np.arange(0, n, step)[:, None]
-    indices = indices + np.arange(block_size)
-    blocks = x[indices]
-    return func(blocks)
 
-def CBM(x, block_size, k=2, superblock_random = False, circular=True, step=1):
+    if circular:
+        pad = block_size - 1
+        x = np.concatenate([x, x[...,:pad]], axis=-1)
+        T += pad
+
+    if random:
+        num_blocks = T // step
+        start_idxs = np.random.randint(0, T - block_size + 1, size=(num_blocks,))
+    else:
+        start_idxs = np.arange(0, T - block_size + 1, step)
+
+    # Gather blocks along the last axis using advanced indexing
+    blocks = safe_block_gather(x, start_idxs, block_size, func, chunk_size=chunk_size)
+    return blocks
+
+def CBM(x, block_size, k=2, superblock_random=False, circular=True, step=1, chunk_size=10):
     """
     Compute circular block maxima sample with superblocks.
     
@@ -60,11 +78,7 @@ def CBM(x, block_size, k=2, superblock_random = False, circular=True, step=1):
     - List of maxima from circular blocks
     """
     kr = k * block_size
-    blocks = sample_blocks(x, kr, random=superblock_random, circular=False, step=None)
-    maxima = []
+    blocks = sample_blocks(x, kr, random=superblock_random, circular=False, step=None, chunk_size=chunk_size)
+    maxima = sample_blocks(blocks, block_size, circular=True, step=step, func=lambda x: np.max(x, axis=-1), chunk_size=chunk_size)
 
-    for block in blocks:
-        maxima.extend(sample_blocks(block, block_size, circular=True, step=step, func=np.max))
-
-
-    return np.array(maxima)
+    return maxima

@@ -6,10 +6,20 @@ import nicks_functions as nf
 def setup_data():
     return np.array([1, 2, 3, 4, 5, 6, 7, 8])
 
+def test_safe_block_gather(setup_data):
+    block_size = 2
+    start_idxs = setup_data[:1-block_size]-1
+    result1 = nf.safe_block_gather(setup_data, start_idxs, block_size, func=lambda x: x, chunk_size=6)
+    result2 = nf.safe_block_gather(setup_data, start_idxs, block_size, func=lambda x: np.max(x, axis=-1), chunk_size=3)
+    expected1 = np.array([[1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8]])
+    expected2 = np.array([2, 3, 4, 5, 6, 7, 8])
+    assert np.array_equal(result1, expected1)
+    assert np.array_equal(result2, expected2)
+
 def test_sliding_blocks_basic(setup_data):
     result = nf.sample_blocks(setup_data, block_size=2)
-    expected = [np.array([1, 2]), np.array([3, 4]), np.array([5, 6]), np.array([7, 8])]
-    assert all(np.array_equal(r, e) for r, e in zip(result, expected))
+    expected = np.array([[1, 2], [3, 4], [5, 6], [7, 8]])
+    assert np.array_equal(result, expected)
 
 def test_sliding_blocks_circular(setup_data):
     result = nf.sample_blocks(setup_data, block_size=2, circular=True, step=1)
@@ -29,8 +39,7 @@ def test_sliding_blocks_error():
 def test_random_blocks_basic(setup_data):
     np.random.seed(0)  # For reproducibility
     result = nf.sample_blocks(setup_data, random=True, block_size=2)
-    assert len(result) == 4
-    assert all(len(block) == 2 for block in result)
+    assert result.shape == (4, 2)
 
 def test_random_blocks_sample_size(setup_data):
     np.random.seed(0)  # For reproducibility
@@ -41,33 +50,28 @@ def test_random_blocks_error():
     with pytest.raises(ValueError):
         nf.sample_blocks([1, 2, 3], random=True, block_size=2)
 
-def test_CBM_basic(setup_data):
-    result = nf.CBM(setup_data, block_size=2, k=2)
-    assert isinstance(result, list)
-    assert all(isinstance(x, (int, float, np.number)) for x in result)
-
 def test_CBM_different_k(setup_data):
-    result1 = nf.CBM(setup_data, block_size=2, k=2)
-    result2 = nf.CBM(setup_data, block_size=2, k=4)
-    assert result1[3] != result2[3]
-    assert len(result1) == len(setup_data)
-    assert len(result2) == len(setup_data)
+    result1 = nf.CBM(setup_data, block_size=2, k=2, chunk_size=3)
+    result2 = nf.CBM(setup_data, block_size=2, k=4, chunk_size=5)
+    assert result1.size == setup_data.size
+    assert result2.size == setup_data.size
 
 def test_CBM_different_block_size(setup_data):
-    result1 = nf.CBM(setup_data, block_size=1, k=1)
-    result2 = nf.CBM(setup_data, block_size=8, k=1)
+    result1 = nf.CBM(setup_data, block_size=1, k=1, chunk_size=1)
+    result2 = nf.CBM(setup_data, block_size=8, k=1, chunk_size=2)
     for i in range(len(result1)):
         assert result1[i] == setup_data[i]
     for i in range(1, len(result2)):
         assert result2[i-1] == result2[i]
-    assert len(result1) == len(setup_data)
-    assert len(result2) == len(setup_data)
+    assert result1.size == setup_data.size
+    assert result2.size == setup_data.size
 
 def test_CBM_step_size(setup_data):
-    result = nf.CBM(setup_data, block_size=2, step=1)
-    assert len(result) > len(nf.CBM(setup_data, block_size=2, step=2))
+    result1 = nf.CBM(setup_data, block_size=2, step=1, chunk_size=5)
+    result2 = nf.CBM(setup_data, block_size=2, step=2, chunk_size=6)
+    assert result1.size // 2 == result2.size
 
 def test_CBM_circular(setup_data):
     result_circular = nf.CBM(setup_data, block_size=2, circular=True)
     result_noncircular = nf.CBM(setup_data, block_size=2, circular=False)
-    assert len(result_circular) >= len(result_noncircular)
+    assert result_circular.size >= result_noncircular.size
