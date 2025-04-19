@@ -1,20 +1,6 @@
 import numpy as np
 
-def safe_block_gather(x, start_idxs, block_size, func = lambda x: x, chunk_size=10):
-    results = []
-    n_dims = len(x.shape)
-    for i in range(0, len(start_idxs), chunk_size):
-        if i + chunk_size > len(start_idxs):
-            chunk = start_idxs[i:]
-        else:
-            chunk = start_idxs[i:i+chunk_size]
-        block_idxs = chunk[:, None] + np.arange(block_size)
-        # blocks_chunk = x[..., block_idxs]  # (..., chunk_size, block_size)
-        blocks_chunk = np.take(x, block_idxs, axis=-1)
-        results.append(func(blocks_chunk))
-    return np.concatenate(results, axis=n_dims-1)
-
-def sample_blocks(x, block_size, random=False, circular=True, step=None, func=lambda x: x, chunk_size=10):
+def sample_blocks(x, block_size, random=False, circular=True, step=None, func=lambda x: x):
     """
     Vectorized block sampling along the last axis of an n-D array.
     
@@ -59,10 +45,12 @@ def sample_blocks(x, block_size, random=False, circular=True, step=None, func=la
         start_idxs = np.arange(0, T - block_size + 1, step)
 
     # Gather blocks along the last axis using advanced indexing
-    blocks = safe_block_gather(x, start_idxs, block_size, func, chunk_size=chunk_size)
-    return blocks
+    blocks = []
+    for start_idx in start_idxs:
+        blocks.append(func(x[..., start_idx:start_idx + block_size]))
+    return np.squeeze(np.array(blocks))
 
-def CBM(x, block_size, k=2, superblock_random=False, circular=True, step=1, chunk_size=10):
+def CBM(x, block_size, k=2, superblock_random=False, circular=True, step=1):
     """
     Compute circular block maxima sample with superblocks.
     
@@ -78,7 +66,7 @@ def CBM(x, block_size, k=2, superblock_random=False, circular=True, step=1, chun
     - List of maxima from circular blocks
     """
     kr = k * block_size
-    blocks = sample_blocks(x, kr, random=superblock_random, circular=False, step=None, chunk_size=chunk_size)
-    maxima = sample_blocks(blocks, block_size, circular=True, step=step, func=lambda x: np.max(x, axis=-1), chunk_size=chunk_size)
+    blocks = sample_blocks(x, kr, random=superblock_random, circular=False, step=None)
+    maxima = sample_blocks(blocks, block_size, circular=True, step=step, func=lambda x: np.max(x, axis=-1))
 
     return maxima
