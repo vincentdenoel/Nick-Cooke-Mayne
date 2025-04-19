@@ -19,7 +19,7 @@ def sample_blocks(x, block_size, random=False, circular=True, step=None, func=la
 
     Example usage:
     - Sliding Block: random=False, step=1
-    - Sliding Block Maxima: random=False, step=1, func=lambda x: np.max(x, axis=1)
+    - Sliding Block Maxima: random=False, step=1, func=lambda x: np.max(x, axis=-1)
     - Disjoint Block: random=False, step=None
     - Random Blocks (N blocks): random=True, step=len(x)/N
     """
