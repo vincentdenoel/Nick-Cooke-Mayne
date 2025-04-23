@@ -17,8 +17,8 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3]):
     
     # Initialize or load data
     dothis = True  # Perform the Monte Carlo simulation (could be long)
-    nbRuns = 1000  # Number of Monte Carlo runs
-    saveStep = 2
+    nbRuns = 100000  # Number of Monte Carlo runs
+    saveStep = 100
     parquet_dir = 'maximas_data'
 
     # Create directory if it doesn't exist
