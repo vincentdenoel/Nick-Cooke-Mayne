@@ -17,9 +17,13 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
     
     # Initialize or load data
     dothis = True  # Perform the Monte Carlo simulation (could be long)
-    nbRuns = 10000  # Number of Monte Carlo runs
-    saveStep = 100
+    saveStep = 1
     parquet_dir = 'maximas_data'
+    T_base = 6000  # Base time series length
+    block_base = 10  # Base block sizes
+    spinup_blocks = 1
+    nbRuns = 10000 * block_base // n_blocks  # Number of Monte Carlo runs
+    T = T_base * (n_blocks + spinup_blocks) / block_base
 
     # Create directory if it doesn't exist
     os.makedirs(parquet_dir, exist_ok=True)
@@ -38,7 +42,10 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
     
         for k in range(k_start, nbRuns):
             for i in series_types:
-                x, t, dt = gen_sample(i, T=6000)
+                x, t, dt = gen_sample(i, T=T)
+                start_index = int(len(x) * spinup_blocks / (n_blocks + spinup_blocks))
+                x = x[start_index:]
+                t = t[start_index:]
                 T = len(x)
                 block_max = lambda x: np.max(x, axis=-1)
             
@@ -72,9 +79,9 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
                         parquet_file = os.path.join(parquet_dir, key)
 
                         if os.path.exists(parquet_file):
-                            ddf.to_parquet(parquet_file, append=True, compression="snappy", write_index=False)
+                            ddf.to_parquet(parquet_file, append=True, compression="zstd", write_index=False)
                         else:
-                            ddf.to_parquet(parquet_file, compression="snappy", write_index=False)
+                            ddf.to_parquet(parquet_file, compression="zstd", write_index=False)
                     
                         # Clear the list after saving
                         maximas[key] = []
