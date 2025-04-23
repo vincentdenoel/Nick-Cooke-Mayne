@@ -2,3 +2,4 @@
 /wind_psd.py
 *.pkl
 *.parquet
+slurm-*.out
