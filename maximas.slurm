@@ -6,7 +6,7 @@
 #SBATCH --mem-per-cpu=8G   # 8GB per CPU = 32GB total per array task
 #SBATCH --partition=serc
 #SBATCH --mail-type=ALL
-#SBATCH --array=0-11
+#SBATCH --array=0-3
 
 # Set OpenMP environment variables
 export OMP_NUM_THREADS=4
@@ -14,4 +14,4 @@ export MKL_NUM_THREADS=4
 
 # conda activate pycascade
 export PYTHONUNBUFFERED=True
-python gen_block_maxima.py --series_type=9 #$SLURM_ARRAY_TASK_ID
+python gen_block_maxima.py --series_type=3 #$SLURM_ARRAY_TASK_ID

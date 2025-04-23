@@ -95,8 +95,8 @@ def main():
     args = parser.parse_args()
 
     n_blocks = 10  # Number of blocks
-    series_types = [args.series_type // 3] if args.series_type is not None else [0, 1, 2, 3]
-    k_blocks = [2 * (args.series_type % 3)] if args.series_type is not None else [0, 2, 4]
+    series_types = [args.series_type] if args.series_type is not None else [0, 1, 2, 3]
+    k_blocks = [0, 2, 4]
     print(f"series_types: {series_types}, k_blocks: {k_blocks}")
     gen_block_maxima(n_blocks, series_types=series_types, k_blocks=k_blocks)
 
