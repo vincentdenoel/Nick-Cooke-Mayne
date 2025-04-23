@@ -7,7 +7,7 @@ import nicks_functions as nf
 
 import time
 
-def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3]):
+def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4]):
     """
     Generate block maxima for different series and save them to parquet files.
     
@@ -30,9 +30,11 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3]):
 
         maximas = {}
         for i in series_types:
-            maximas[f"series{i}_SBM"] = []
-            for k_blocks in [2, 4]:
-                maximas[f"series{i}_CBM_k{k_blocks}"] = []
+            for k_block in k_blocks:
+                if k_block == 0:
+                    maximas[f"series{i}_SBM"] = []
+                else:
+                    maximas[f"series{i}_CBM_k{k_block}"] = []
     
         for k in range(k_start, nbRuns):
             for i in series_types:
@@ -40,12 +42,12 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3]):
                 T = len(x)
                 block_max = lambda x: np.max(x, axis=-1)
             
-                # Process and store data
-                maximas[f"series{i}_SBM"].append(nf.sample_blocks(x, T//n_blocks, random=False, circular=True, step = 1, func=block_max))
-            
-                for k_blocks in [2, 4]:
-                    r = int(len(x)/n_blocks/k_blocks)
-                    maximas[f"series{i}_CBM_k{k_blocks}"].append(nf.CBM(x, r, k = k_blocks, circular=False, step = 1).flatten())
+                for k_block in k_blocks:
+                    if k_block == 0:
+                        maximas[f"series{i}_SBM"].append(nf.sample_blocks(x, T//n_blocks, random=False, circular=True, step = 1, func=block_max))
+                    else:
+                        r = int(len(x)/n_blocks/k_block)
+                        maximas[f"series{i}_CBM_k{k_block}"].append(nf.CBM(x, r, k = k_block, circular=False, step = 1).flatten())
         
             # Save data every saveStep iterations
             if k % saveStep == 0 and k >= 0:
@@ -93,8 +95,10 @@ def main():
     args = parser.parse_args()
 
     n_blocks = 10  # Number of blocks
-    series_types = [args.series_type] if args.series_type is not None else [0, 1, 2, 3]
-    gen_block_maxima(n_blocks, series_types=series_types)
+    series_types = [args.series_type // 3] if args.series_type is not None else [0, 1, 2, 3]
+    k_blocks = [2 * (args.series_type % 3)] if args.series_type is not None else [0, 2, 4]
+    print(f"series_types: {series_types}, k_blocks: {k_blocks}")
+    gen_block_maxima(n_blocks, series_types=series_types, k_blocks=k_blocks)
 
 if __name__ == "__main__":
     main()
