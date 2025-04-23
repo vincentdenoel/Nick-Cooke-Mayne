@@ -50,7 +50,7 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
                         maximas[f"series{i}_CBM_k{k_block}"].append(nf.CBM(x, r, k = k_block, circular=False, step = 1).flatten())
         
             # Save data every saveStep iterations
-            if k % saveStep == 0 and k >= 0:
+            if (k + 1) % saveStep == 0:
                 for key, data_list in maximas.items():
                     if data_list:  # Only process non-empty lists
                         # Stack all arrays in the list into a single 2D array
