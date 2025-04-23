@@ -1,2 +1,4 @@
 /__pycache__
 /wind_psd.py
+*.pkl
+*.parquet
