@@ -7,7 +7,7 @@ import nicks_functions as nf
 
 import time
 
-def gen_block_maxima(n_blocks=1000, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4]):
+def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4]):
     """
     Generate block maxima for different series and save them to parquet files.
     
@@ -24,6 +24,7 @@ def gen_block_maxima(n_blocks=1000, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4
     spinup_blocks = 1
     nbRuns = 10000 * block_base // n_blocks  # Number of Monte Carlo runs
     T = T_base * (n_blocks + spinup_blocks) / block_base
+    unique_timestamp = int(time.time())
 
     print(f"n_blocks: {n_blocks}, nbRuns: {nbRuns}")
 
@@ -34,15 +35,15 @@ def gen_block_maxima(n_blocks=1000, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4
         start_time = time.time()
         k_start = 0
 
-        maximas = {}
         for i in series_types:
             for k_block in k_blocks:
                 if k_block == 0:
-                    maximas[f"series{i}_SBM"] = []
+                    maximas[f"series{i}_SBM-{unique_timestamp}"] = []
                 else:
-                    maximas[f"series{i}_CBM_k{k_block}"] = []
+                    maximas[f"series{i}_CBM_k{k_block}-{unique_timestamp}"] = []
     
         for k in range(k_start, nbRuns):
+            maximas = {}
             for i in series_types:
                 x, t, dt = gen_sample(i, T=T)
                 start_index = int(len(x) * spinup_blocks / (n_blocks + spinup_blocks))
@@ -53,10 +54,10 @@ def gen_block_maxima(n_blocks=1000, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4
             
                 for k_block in k_blocks:
                     if k_block == 0:
-                        maximas[f"series{i}_SBM"].append(nf.sample_blocks(x, T//n_blocks, random=False, circular=True, step = 1, func=block_max))
+                        maximas[f"series{i}_SBM-{unique_timestamp}"].append(nf.sample_blocks(x, T//n_blocks, random=False, circular=True, step = 1, func=block_max))
                     else:
                         r = int(len(x)/n_blocks/k_block)
-                        maximas[f"series{i}_CBM_k{k_block}"].append(nf.CBM(x, r, k = k_block, circular=False, step = 1).flatten())
+                        maximas[f"series{i}_CBM_k{k_block}-{unique_timestamp}"].append(nf.CBM(x, r, k = k_block, circular=False, step = 1).flatten())
         
             # Save data every saveStep iterations
             if (k + 1) % saveStep == 0:
@@ -103,7 +104,7 @@ def main():
     parser.add_argument('--series_type', type=int, help='Type of series to generate (0-3)')
     args = parser.parse_args()
 
-    n_blocks = 1000  # Number of blocks
+    n_blocks = 10  # Number of blocks
     series_types = [args.series_type] if args.series_type is not None else [0, 1, 2, 3]
     k_blocks = [0, 2, 4]
     print(f"series_types: {series_types}, k_blocks: {k_blocks}")
