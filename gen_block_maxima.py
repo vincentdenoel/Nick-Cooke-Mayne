@@ -17,7 +17,7 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
     
     # Initialize or load data
     dothis = True  # Perform the Monte Carlo simulation (could be long)
-    saveStep = 1
+    saveStep = 100
     parquet_dir = 'maximas_data'
     T_base = 6000  # Base time series length
     block_base = 10  # Base block sizes
@@ -35,6 +35,7 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
         start_time = time.time()
         k_start = 0
 
+        maximas = {}
         for i in series_types:
             for k_block in k_blocks:
                 if k_block == 0:
@@ -43,18 +44,16 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
                     maximas[f"series{i}_CBM_k{k_block}-{unique_timestamp}"] = []
     
         for k in range(k_start, nbRuns):
-            maximas = {}
             for i in series_types:
                 x, t, dt = gen_sample(i, T=T)
                 start_index = int(len(x) * spinup_blocks / (n_blocks + spinup_blocks))
                 x = x[start_index:]
                 t = t[start_index:]
-                T = len(x)
                 block_max = lambda x: np.max(x, axis=-1)
             
                 for k_block in k_blocks:
                     if k_block == 0:
-                        maximas[f"series{i}_SBM-{unique_timestamp}"].append(nf.sample_blocks(x, T//n_blocks, random=False, circular=True, step = 1, func=block_max))
+                        maximas[f"series{i}_SBM-{unique_timestamp}"].append(nf.sample_blocks(x, len(x)//n_blocks, random=False, circular=True, step = 1, func=block_max))
                     else:
                         r = int(len(x)/n_blocks/k_block)
                         maximas[f"series{i}_CBM_k{k_block}-{unique_timestamp}"].append(nf.CBM(x, r, k = k_block, circular=False, step = 1).flatten())
