@@ -7,7 +7,7 @@ import nicks_functions as nf
 
 import time
 
-def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4]):
+def gen_block_maxima(n_blocks=1000, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4]):
     """
     Generate block maxima for different series and save them to parquet files.
     
@@ -24,6 +24,8 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
     spinup_blocks = 1
     nbRuns = 10000 * block_base // n_blocks  # Number of Monte Carlo runs
     T = T_base * (n_blocks + spinup_blocks) / block_base
+
+    print(f"n_blocks: {n_blocks}, nbRuns: {nbRuns}")
 
     # Create directory if it doesn't exist
     os.makedirs(parquet_dir, exist_ok=True)
@@ -63,15 +65,15 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
                         # Stack all arrays in the list into a single 2D array
                         data_array = np.vstack(data_list)
                         print(f"Saving {key} with shape {data_array.shape}")
-                        n_samples, n_features = data_array.shape
+                        # n_samples, n_features = data_array.shape
 
-                        sample_ids = np.repeat(np.arange(n_samples), n_features)
-                        feature_ids = np.tile(np.arange(n_features), n_samples)
+                        # sample_ids = np.repeat(np.arange(n_samples), n_features)
+                        # feature_ids = np.tile(np.arange(n_features), n_samples)
                         values = data_array.ravel()
 
                         df_long = pd.DataFrame({
-                            "sample_id": sample_ids,
-                            "feature_id": feature_ids,
+                            # "sample_id": sample_ids,
+                            # "feature_id": feature_ids,
                             "value": values
                         })
                         ddf = dd.from_pandas(df_long, npartitions=1)
@@ -101,7 +103,7 @@ def main():
     parser.add_argument('--series_type', type=int, help='Type of series to generate (0-3)')
     args = parser.parse_args()
 
-    n_blocks = 10  # Number of blocks
+    n_blocks = 1000  # Number of blocks
     series_types = [args.series_type] if args.series_type is not None else [0, 1, 2, 3]
     k_blocks = [0, 2, 4]
     print(f"series_types: {series_types}, k_blocks: {k_blocks}")
