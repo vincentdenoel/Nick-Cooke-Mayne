@@ -37,11 +37,12 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
 
         maximas = {}
         for i in series_types:
+            maximas[f"series{i}"] = {}
             for k_block in k_blocks:
                 if k_block == 0:
-                    maximas[f"series{i}_SBM-{unique_timestamp}"] = []
+                    maximas[f"series{i}"][f"SBM-{unique_timestamp}"] = []
                 else:
-                    maximas[f"series{i}_CBM_k{k_block}-{unique_timestamp}"] = []
+                    maximas[f"series{i}"][f"CBM_k{k_block}-{unique_timestamp}"] = []
     
         for k in range(k_start, nbRuns):
             for i in series_types:
@@ -53,40 +54,32 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
             
                 for k_block in k_blocks:
                     if k_block == 0:
-                        maximas[f"series{i}_SBM-{unique_timestamp}"].append(nf.sample_blocks(x, len(x)//n_blocks, random=False, circular=True, step = 1, func=block_max))
+                        maximas[f"series{i}"][f"SBM-{unique_timestamp}"].append(nf.sample_blocks(x, len(x)//n_blocks, random=False, circular=True, step = 1, func=block_max))
                     else:
                         r = int(len(x)/n_blocks/k_block)
-                        maximas[f"series{i}_CBM_k{k_block}-{unique_timestamp}"].append(nf.CBM(x, r, k = k_block, circular=False, step = 1).flatten())
+                        maximas[f"series{i}"][f"CBM_k{k_block}-{unique_timestamp}"].append(nf.CBM(x, r, k = k_block, circular=False, step = 1).flatten())
         
             # Save data every saveStep iterations
             if (k + 1) % saveStep == 0:
-                for key, data_list in maximas.items():
-                    if data_list:  # Only process non-empty lists
-                        # Stack all arrays in the list into a single 2D array
-                        data_array = np.vstack(data_list)
-                        print(f"Saving {key} with shape {data_array.shape}")
-                        # n_samples, n_features = data_array.shape
+                for i in series_types:
+                    combined = {}
+                    for key, data_list in maximas[f"series{i}"].items():
+                        if data_list:  # Only process non-empty lists
+                            stacked = np.vstack(data_list)
+                            print(f"Saving {key} with shape {stacked.shape}")
+                            values = stacked.ravel()
+                            combined[key] = values
+                            maximas[f"series{i}"][key] = []
 
-                        # sample_ids = np.repeat(np.arange(n_samples), n_features)
-                        # feature_ids = np.tile(np.arange(n_features), n_samples)
-                        values = data_array.ravel()
+                    df_long = pd.DataFrame(combined)
+                    ddf = dd.from_pandas(df_long, npartitions=1)
 
-                        df_long = pd.DataFrame({
-                            # "sample_id": sample_ids,
-                            # "feature_id": feature_ids,
-                            "value": values
-                        })
-                        ddf = dd.from_pandas(df_long, npartitions=1)
+                    parquet_file = os.path.join(parquet_dir, f"series{i}.parquet")
 
-                        parquet_file = os.path.join(parquet_dir, key)
-
-                        if os.path.exists(parquet_file):
-                            ddf.to_parquet(parquet_file, append=True, compression="zstd", write_index=False)
-                        else:
-                            ddf.to_parquet(parquet_file, compression="zstd", write_index=False)
-                    
-                        # Clear the list after saving
-                        maximas[key] = []
+                    if os.path.exists(parquet_file):
+                        ddf.to_parquet(parquet_file, append=True, compression="zstd", write_index=False)
+                    else:
+                        ddf.to_parquet(parquet_file, compression="zstd", write_index=False)
             
                 print(f"Saved data at iteration {k}")
 
