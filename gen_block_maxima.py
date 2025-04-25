@@ -40,9 +40,9 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
             maximas[f"series{i}"] = {}
             for k_block in k_blocks:
                 if k_block == 0:
-                    maximas[f"series{i}"][f"SBM-{unique_timestamp}"] = []
+                    maximas[f"series{i}"][f"SBM"] = []
                 else:
-                    maximas[f"series{i}"][f"CBM_k{k_block}-{unique_timestamp}"] = []
+                    maximas[f"series{i}"][f"CBM_k{k_block}"] = []
     
         for k in range(k_start, nbRuns):
             for i in series_types:
@@ -54,10 +54,10 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
             
                 for k_block in k_blocks:
                     if k_block == 0:
-                        maximas[f"series{i}"][f"SBM-{unique_timestamp}"].append(nf.sample_blocks(x, len(x)//n_blocks, random=False, circular=True, step = 1, func=block_max))
+                        maximas[f"series{i}"][f"SBM"].append(nf.sample_blocks(x, len(x)//n_blocks, random=False, circular=True, step = 1, func=block_max))
                     else:
                         r = int(len(x)/n_blocks/k_block)
-                        maximas[f"series{i}"][f"CBM_k{k_block}-{unique_timestamp}"].append(nf.CBM(x, r, k = k_block, circular=False, step = 1).flatten())
+                        maximas[f"series{i}"][f"CBM_k{k_block}"].append(nf.CBM(x, r, k = k_block, circular=False, step = 1).flatten())
         
             # Save data every saveStep iterations
             if (k + 1) % saveStep == 0:
@@ -74,7 +74,7 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
                     df_long = pd.DataFrame(combined)
                     ddf = dd.from_pandas(df_long, npartitions=1)
 
-                    parquet_file = os.path.join(parquet_dir, f"series{i}.parquet")
+                    parquet_file = os.path.join(parquet_dir, f"series{i}-{unique_timestamp}.parquet")
 
                     if os.path.exists(parquet_file):
                         ddf.to_parquet(parquet_file, append=True, compression="zstd", write_index=True)
