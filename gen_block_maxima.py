@@ -77,9 +77,9 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
                     parquet_file = os.path.join(parquet_dir, f"series{i}.parquet")
 
                     if os.path.exists(parquet_file):
-                        ddf.to_parquet(parquet_file, append=True, compression="zstd", write_index=False)
+                        ddf.to_parquet(parquet_file, append=True, compression="zstd", write_index=True)
                     else:
-                        ddf.to_parquet(parquet_file, compression="zstd", write_index=False)
+                        ddf.to_parquet(parquet_file, compression="zstd", write_index=True)
             
                 print(f"Saved data at iteration {k}")
 
