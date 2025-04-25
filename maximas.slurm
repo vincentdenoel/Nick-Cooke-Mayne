@@ -1,16 +1,16 @@
 #!/bin/bash
 #SBATCH --job-name=mc_maximas
 #SBATCH -N 1
-#SBATCH --cpus-per-task=4  # Request 4 CPUs per array task
-#SBATCH --time=120:00:00
+#SBATCH --cpus-per-task=1  # Request 4 CPUs per array task
+#SBATCH --time=108:00:00
 #SBATCH --mem-per-cpu=8G   # 8GB per CPU = 32GB total per array task
 #SBATCH --partition=serc
 #SBATCH --mail-type=ALL
 #SBATCH --array=0-3
 
-# Set OpenMP environment variables
-export OMP_NUM_THREADS=4
-export MKL_NUM_THREADS=4
+# # Set OpenMP environment variables
+# export OMP_NUM_THREADS=1
+# export MKL_NUM_THREADS=1
 
 # conda activate pycascade
 export PYTHONUNBUFFERED=True
