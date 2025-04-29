@@ -7,7 +7,7 @@ import nicks_functions as nf
 
 import time
 
-def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4]):
+def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4], unique_stamp=None):
     """
     Generate block maxima for different series and save them to parquet files.
     
@@ -17,14 +17,15 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
     
     # Initialize or load data
     dothis = True  # Perform the Monte Carlo simulation (could be long)
-    saveStep = 100
+    saveStep = 50
     parquet_dir = 'maximas_data'
     T_base = 6000  # Base time series length
     block_base = 10  # Base block sizes
     spinup_blocks = 1
     nbRuns = 10000 * block_base // n_blocks  # Number of Monte Carlo runs
     T = T_base * (n_blocks + spinup_blocks) / block_base
-    unique_timestamp = int(time.time())
+    if unique_stamp is None:
+        unique_stamp = int(time.time())
 
     print(f"n_blocks: {n_blocks}, nbRuns: {nbRuns}")
 
@@ -43,6 +44,12 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
                     maximas[f"series{i}"][f"SBM"] = []
                 else:
                     maximas[f"series{i}"][f"CBM_k{k_block}"] = []
+
+        # OUTSIDE LOOP: Track how many samples you wrote
+        written_counts = {}  # key: series name, value: number of rows
+        for i in series_types:
+            for key in maximas[f"series{i}"].keys():
+                written_counts[f"series{i}-{key}"] = 0  # initialize counters
     
         for k in range(k_start, nbRuns):
             for i in series_types:
@@ -66,22 +73,30 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4])
                     for key, data_list in maximas[f"series{i}"].items():
                         if data_list:  # Only process non-empty lists
                             stacked = np.vstack(data_list)
-                            print(f"Saving {key} with shape {stacked.shape}")
                             values = stacked.ravel()
                             combined[key] = values
                             maximas[f"series{i}"][key] = []
 
                     df_long = pd.DataFrame(combined)
+
+                    # Manually adjust the index based on how many rows we've already written
+                    series_name = f"series{i}"
+                    start_idx = written_counts.get(series_name, 0)
+                    df_long.index = np.arange(start_idx, start_idx + len(df_long))
+        
+                    # Update written counts
+                    written_counts[series_name] = start_idx + len(df_long)
+
                     ddf = dd.from_pandas(df_long, npartitions=1)
 
-                    parquet_file = os.path.join(parquet_dir, f"series{i}-{unique_timestamp}.parquet")
+                    parquet_file = os.path.join(parquet_dir, f"{series_name}-{unique_stamp}.parquet")
 
                     if os.path.exists(parquet_file):
                         ddf.to_parquet(parquet_file, append=True, compression="zstd", write_index=True)
                     else:
                         ddf.to_parquet(parquet_file, compression="zstd", write_index=True)
             
-                print(f"Saved data at iteration {k}")
+                    print(f"Saved data at iteration {k}")
 
             elapsed_time = time.time() - start_time
             print(f"Entry {k}, time {elapsed_time:.2f} seconds")
@@ -94,13 +109,15 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description='Generate block maxima for time series')
     parser.add_argument('--series_type', type=int, help='Type of series to generate (0-3)')
+    parser.add_argument('--unique_stamp', type=int, help='Unique stamp for file naming')
     args = parser.parse_args()
 
     n_blocks = 10  # Number of blocks
     series_types = [args.series_type] if args.series_type is not None else [0, 1, 2, 3]
+    unique_stamp = args.unique_stamp if args.unique_stamp is not None else None
     k_blocks = [0, 2, 4]
     print(f"series_types: {series_types}, k_blocks: {k_blocks}")
-    gen_block_maxima(n_blocks, series_types=series_types, k_blocks=k_blocks)
+    gen_block_maxima(n_blocks, series_types=series_types, k_blocks=k_blocks, unique_stamp=unique_stamp)
 
 if __name__ == "__main__":
     main()
