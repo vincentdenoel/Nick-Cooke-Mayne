@@ -44,12 +44,6 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4],
                     maximas[f"series{i}"][f"SBM"] = []
                 else:
                     maximas[f"series{i}"][f"CBM_k{k_block}"] = []
-
-        # OUTSIDE LOOP: Track how many samples you wrote
-        written_counts = {}  # key: series name, value: number of rows
-        for i in series_types:
-            for key in maximas[f"series{i}"].keys():
-                written_counts[f"series{i}-{key}"] = 0  # initialize counters
     
         for k in range(k_start, nbRuns):
             for i in series_types:
@@ -81,20 +75,15 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4],
 
                     # Manually adjust the index based on how many rows we've already written
                     series_name = f"series{i}"
-                    start_idx = written_counts.get(series_name, 0)
-                    df_long.index = np.arange(start_idx, start_idx + len(df_long))
-        
-                    # Update written counts
-                    written_counts[series_name] = start_idx + len(df_long)
 
-                    ddf = dd.from_pandas(df_long, npartitions=1)
+                    ddf = dd.from_pandas(df_long, npartitions=saveStep//25)
 
                     parquet_file = os.path.join(parquet_dir, f"{series_name}-{unique_stamp}.parquet")
 
                     if os.path.exists(parquet_file):
-                        ddf.to_parquet(parquet_file, append=True, compression="zstd", write_index=True)
+                        ddf.to_parquet(parquet_file, compression="zstd", append=True, write_index=False, write_metadata_file=True)
                     else:
-                        ddf.to_parquet(parquet_file, compression="zstd", write_index=True)
+                        ddf.to_parquet(parquet_file, compression="zstd", write_index=False, write_metadata_file=True,)
             
                     print(f"Saved data at iteration {k}")
 
@@ -113,7 +102,7 @@ def main():
     args = parser.parse_args()
 
     n_blocks = 10  # Number of blocks
-    series_types = [args.series_type] if args.series_type is not None else [0, 1, 2, 3]
+    series_types = [args.series_type] if args.series_type is not None else [0, 1]
     unique_stamp = args.unique_stamp if args.unique_stamp is not None else None
     k_blocks = [0, 2, 4]
     print(f"series_types: {series_types}, k_blocks: {k_blocks}")
