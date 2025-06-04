@@ -41,7 +41,7 @@ for name in names:
     maximas_data[name] = dd.concat(maximas_data[name], axis=0)
 
 # %%
-maximas_data[name].partitions[0:1].memory_usage(deep=True).sum().compute() / 100e6
+# maximas_data[name].partitions[0:1].memory_usage(deep=True).sum().compute() / 100e6
 
 # %%
 points_per_series = 655360
@@ -204,3 +204,5 @@ for name, ddf in disjoint_maximas.items():
 with open('disjoint_maximas_summary.pkl', 'wb') as f:
     pickle.dump(summary_stats, f)
 
+
+# %%
