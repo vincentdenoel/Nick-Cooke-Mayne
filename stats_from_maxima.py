@@ -92,13 +92,17 @@ standard_disjoint_estimator = {}
 # Dictionary to store standard deviation estimators
 standard_disjoint_std_estimator = {}
 
-for name in disjoint_maximas.keys():
-    # Group by every 10 points
-    grouped = disjoint_maximas[name].groupby(disjoint_maximas[name].index // 10)
-    # Calculate mean for each group
-    standard_disjoint_estimator[name] = grouped.mean().compute()
-    # Calculate standard deviation for each group
-    standard_disjoint_std_estimator[name] = grouped.std(ddof=1).compute()
+for name, ddf in disjoint_maximas.items():
+    # give each row a unique, monotonic index
+    ddf0 = ddf.reset_index(drop=True)
+    # now group by every 10 rows of that global index
+    grp = ddf0.groupby(ddf0.index // 10)
+    standard_disjoint_estimator[name]     = grp.mean().compute()
+    standard_disjoint_std_estimator[name] = grp.std(ddof=1).compute()
+
+print("Standard disjoint estimators computed.")
+
+# %%
 
 def bootstrap_stats_partition(df, group_size=10, n_boot=100):
     """
@@ -170,8 +174,10 @@ for name, ddf in disjoint_maximas.items():
     bs_disjoint_estimator[name]     = means
     bs_disjoint_std_estimator[name] = stds
 
+print("Bootstrap disjoint estimators computed.")
 # Now `bs_disjoint_estimator` and `bs_disjoint_std_estimator` hold your results per series.
 
+# %%
 # Bundle both dicts into one object
 estimators = {
     'means': {
@@ -188,6 +194,7 @@ estimators = {
 with open('./estimators.pkl', 'wb') as f:
     pickle.dump(estimators, f)
 
+print("Estimators saved to disk.")
 
 # %%
 # 1) Compute summary stats for each series
@@ -204,5 +211,7 @@ for name, ddf in disjoint_maximas.items():
 with open('disjoint_maximas_summary.pkl', 'wb') as f:
     pickle.dump(summary_stats, f)
 
+print("Summary stats for disjoint maximas saved to disk.")
+print("Completed")
 
 # %%
