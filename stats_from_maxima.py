@@ -87,18 +87,41 @@ for name in maximas_data.keys():
     )
 
 # %%
+def agg_within_partition(df, group_size=10):
+    # reset local index
+    df = df.reset_index(drop=True)
+    # group every group_size rows
+    grp = df.groupby(df.index // group_size)
+    # compute mean and std, suffix columns, then concat
+    means = grp.mean().add_suffix('_mean')
+    stds  = grp.std(ddof=1).add_suffix('_std')
+    return pd.concat([means, stds], axis=1)
+
 # Dictionary to store mean estimators
 standard_disjoint_estimator = {}
 # Dictionary to store standard deviation estimators
 standard_disjoint_std_estimator = {}
 
 for name, ddf in disjoint_maximas.items():
-    # give each row a unique, monotonic index
-    ddf0 = ddf.reset_index(drop=True)
-    # now group by every 10 rows of that global index
-    grp = ddf0.groupby(ddf0.index // 10)
-    standard_disjoint_estimator[name]     = grp.mean().compute()
-    standard_disjoint_std_estimator[name] = grp.std(ddof=1).compute()
+    # build a minimal “meta” so Dask knows the output dtypes/columns
+    cols      = ddf.columns
+    meta_cols = [f"{c}_mean" for c in cols] + [f"{c}_std" for c in cols]
+    meta      = pd.DataFrame(columns=meta_cols, dtype=float)
+
+    # compute one DF with all _mean and _std columns
+    combined = (
+        ddf
+        .map_partitions(agg_within_partition, group_size=10, meta=meta)
+        .compute()
+    )
+
+    # split into two DataFrames
+    means = combined[[c for c in combined.columns if c.endswith('_mean')]]
+    stds  = combined[[c for c in combined.columns if c.endswith('_std')]]
+
+    # store in your two dicts
+    standard_disjoint_estimator[name]     = means
+    standard_disjoint_std_estimator[name] = stds
 
 print("Standard disjoint estimators computed.")
 
