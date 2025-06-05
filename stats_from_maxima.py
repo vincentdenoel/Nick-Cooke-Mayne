@@ -17,6 +17,74 @@ def init_client():
         pass
     return Client()
 
+def sample_segments_partition(pdf, points_per_series=500, sample_size=100):
+    pdf = pdf.reset_index(drop=True)
+    pdf['segment_id'] = pdf.index // points_per_series
+
+    def sample_func(group):
+        if len(group) >= sample_size:
+            return group.sample(n=sample_size, random_state=42)
+        else:
+            return group  # or use sampling with replacement if needed
+
+    sampled = pdf.groupby('segment_id').apply(sample_func)
+    return sampled.drop(columns='segment_id')
+
+def sample_every_n(df, step):
+    return df.iloc[0::step]
+
+def agg_within_partition(df, group_size=10):
+    # reset local index
+    df = df.reset_index(drop=True)
+    # group every group_size rows
+    grp = df.groupby(df.index // group_size)
+    # compute mean and std, suffix columns, then concat
+    means = grp.mean().add_suffix('_mean')
+    stds  = grp.std(ddof=1).add_suffix('_std')
+    return pd.concat([means, stds], axis=1)
+
+
+def bootstrap_stats_partition(df, group_size=10, n_boot=100):
+    """
+    Compute bootstrap mean and std for each column in partitioned DataFrame.
+
+    Parameters:
+    - df: pandas.DataFrame partition (sampled maxima)
+    - group_size: number of rows per bootstrap group
+    - n_boot: number of bootstrap resamples
+
+    Returns:
+    - pandas.DataFrame with MultiIndex columns [(col, stat)] and row index = group index
+    """
+    # Ensure clean positional grouping
+    df = df.reset_index(drop=True)
+    grp_idx = df.index // group_size
+
+    records = []
+    for grp, sub in df.groupby(grp_idx):
+        stats = {}
+        for col in sub.columns:
+            vals = sub[col].values
+            # bootstrap resamples
+            bs_means = np.array([
+                np.random.choice(vals, size=len(vals), replace=True).mean()
+                for _ in range(n_boot)
+            ])
+            bs_stds = np.array([
+                np.std(np.random.choice(vals, size=len(vals), replace=True), ddof=1)
+                for _ in range(n_boot)
+            ])
+            # average of bootstrap replications
+            stats[(col, 'mean')] = bs_means.mean()
+            stats[(col, 'std')]  = bs_stds.mean()
+        # series named by group index
+        rec = pd.Series(stats, name=grp)
+        records.append(rec)
+
+    out = pd.DataFrame(records)
+    out.index.name = 'group'
+    return out
+
 # %%
 def main():
     client = init_client()
@@ -65,9 +133,6 @@ def main():
 
     disjoint_maximas = {}
 
-    def sample_every_n(df, step):
-        return df.iloc[0::step]
-
     for name in maximas_data.keys():
         sampled = maximas_data[name].map_partitions(sample_every_n, step=points_per_block)
         disjoint_maximas[name] = sampled
@@ -80,19 +145,6 @@ def main():
         overlapping_maximas[name] = sampled
 
     # %%
-    def sample_segments_partition(pdf, points_per_series=500, sample_size=100):
-        pdf = pdf.reset_index(drop=True)
-        pdf['segment_id'] = pdf.index // points_per_series
-
-        def sample_func(group):
-            if len(group) >= sample_size:
-                return group.sample(n=sample_size, random_state=42)
-            else:
-                return group  # or use sampling with replacement if needed
-
-        sampled = pdf.groupby('segment_id').apply(sample_func)
-        return sampled.drop(columns='segment_id')
-
     sampled_maximas = {}
     for name in maximas_data.keys():
         sampled_maximas[name] = maximas_data[name]["SBM"].map_partitions(
@@ -103,16 +155,6 @@ def main():
         )
 
     # %%
-    def agg_within_partition(df, group_size=10):
-        # reset local index
-        df = df.reset_index(drop=True)
-        # group every group_size rows
-        grp = df.groupby(df.index // group_size)
-        # compute mean and std, suffix columns, then concat
-        means = grp.mean().add_suffix('_mean')
-        stds  = grp.std(ddof=1).add_suffix('_std')
-        return pd.concat([means, stds], axis=1)
-
     # Dictionary to store mean estimators
     standard_disjoint_estimator = {}
     # Dictionary to store standard deviation estimators
@@ -142,48 +184,6 @@ def main():
     print("Standard disjoint estimators computed.")
 
     # %%
-
-    def bootstrap_stats_partition(df, group_size=10, n_boot=100):
-        """
-        Compute bootstrap mean and std for each column in partitioned DataFrame.
-
-        Parameters:
-        - df: pandas.DataFrame partition (sampled maxima)
-        - group_size: number of rows per bootstrap group
-        - n_boot: number of bootstrap resamples
-
-        Returns:
-        - pandas.DataFrame with MultiIndex columns [(col, stat)] and row index = group index
-        """
-        # Ensure clean positional grouping
-        df = df.reset_index(drop=True)
-        grp_idx = df.index // group_size
-
-        records = []
-        for grp, sub in df.groupby(grp_idx):
-            stats = {}
-            for col in sub.columns:
-                vals = sub[col].values
-                # bootstrap resamples
-                bs_means = np.array([
-                    np.random.choice(vals, size=len(vals), replace=True).mean()
-                    for _ in range(n_boot)
-                ])
-                bs_stds = np.array([
-                    np.std(np.random.choice(vals, size=len(vals), replace=True), ddof=1)
-                    for _ in range(n_boot)
-                ])
-                # average of bootstrap replications
-                stats[(col, 'mean')] = bs_means.mean()
-                stats[(col, 'std')]  = bs_stds.mean()
-            # series named by group index
-            rec = pd.Series(stats, name=grp)
-            records.append(rec)
-
-        out = pd.DataFrame(records)
-        out.index.name = 'group'
-        return out
-
     # === Applying in Dask ===
     # Assume `disjoint_maximas` is your dict of Dask DataFrames
     bs_disjoint_estimator     = {}
