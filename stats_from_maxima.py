@@ -97,36 +97,45 @@ def agg_within_partition(df, group_size=10):
     stds  = grp.std(ddof=1).add_suffix('_std')
     return pd.concat([means, stds], axis=1)
 
-# Dictionary to store mean estimators
-standard_disjoint_estimator = {}
-# Dictionary to store standard deviation estimators
-standard_disjoint_std_estimator = {}
+# Function to apply standard aggregation to any maxima type
+def apply_standard_agg(maximas_dict, group_size):
+    estimator = {}
+    std_estimator = {}
+    
+    for name, ddf in maximas_dict.items():
+        # build a minimal "meta" so Dask knows the output dtypes/columns
+        cols = ddf.columns if hasattr(ddf, 'columns') else pd.Index(['SBM'])
+        meta_cols = [f"{c}_mean" for c in cols] + [f"{c}_std" for c in cols]
+        meta = pd.DataFrame(columns=meta_cols, dtype=float)
 
-for name, ddf in disjoint_maximas.items():
-    # build a minimal “meta” so Dask knows the output dtypes/columns
-    cols      = ddf.columns
-    meta_cols = [f"{c}_mean" for c in cols] + [f"{c}_std" for c in cols]
-    meta      = pd.DataFrame(columns=meta_cols, dtype=float)
+        # compute one DF with all _mean and _std columns
+        combined = (
+            ddf
+            .map_partitions(agg_within_partition, group_size=group_size, meta=meta)
+            .compute()
+        )
 
-    # compute one DF with all _mean and _std columns
-    combined = (
-        ddf
-        .map_partitions(agg_within_partition, group_size=10, meta=meta)
-        .compute()
-    )
+        # split into two DataFrames
+        means = combined[[c for c in combined.columns if c.endswith('_mean')]]
+        stds = combined[[c for c in combined.columns if c.endswith('_std')]]
 
-    # split into two DataFrames
-    means = combined[[c for c in combined.columns if c.endswith('_mean')]]
-    stds  = combined[[c for c in combined.columns if c.endswith('_std')]]
+        # store in your two dicts
+        estimator[name] = means
+        std_estimator[name] = stds
+    
+    return estimator, std_estimator
 
-    # store in your two dicts
-    standard_disjoint_estimator[name]     = means
-    standard_disjoint_std_estimator[name] = stds
-
+# Apply standard aggregation to different maxima types
+standard_disjoint_estimator, standard_disjoint_std_estimator = apply_standard_agg(disjoint_maximas, 10)
 print("Standard disjoint estimators computed.")
 
-# %%
+standard_overlapping_estimator, standard_overlapping_std_estimator = apply_standard_agg(overlapping_maximas, 100)
+print("Standard overlapping estimators computed.")
 
+standard_sampled_estimator, standard_sampled_std_estimator = apply_standard_agg(sampled_maximas, 100)
+print("Standard sampled estimators computed.")
+
+# %%
 def bootstrap_stats_partition(df, group_size=10, n_boot=100):
     """
     Compute bootstrap mean and std for each column in partitioned DataFrame.
@@ -168,48 +177,65 @@ def bootstrap_stats_partition(df, group_size=10, n_boot=100):
     out.index.name = 'group'
     return out
 
-# === Applying in Dask ===
-# Assume `disjoint_maximas` is your dict of Dask DataFrames
-bs_disjoint_estimator     = {}
-bs_disjoint_std_estimator = {}
+# Function to apply bootstrap aggregation to any maxima type
+def apply_bootstrap_agg(maximas_dict, group_size, n_boot=100):
+    bs_estimator = {}
+    bs_std_estimator = {}
+    
+    for name, ddf in maximas_dict.items():
+        # prepare meta with MultiIndex columns [(col, 'mean'), (col, 'std')]
+        cols = ddf.columns if hasattr(ddf, 'columns') else pd.Index(['SBM'])
+        mi = pd.MultiIndex.from_product([cols, ['mean', 'std']])
+        meta = pd.DataFrame(columns=mi, dtype=float)
 
-for name, ddf in disjoint_maximas.items():
-    # prepare meta with MultiIndex columns [(col, 'mean'), (col, 'std')]
-    cols = ddf.columns
-    mi = pd.MultiIndex.from_product([cols, ['mean', 'std']])
-    meta = pd.DataFrame(columns=mi, dtype=float)
+        # map partitions to compute mean & std together
+        bs_stats_dd = ddf.map_partitions(
+            bootstrap_stats_partition,
+            group_size=group_size,
+            n_boot=n_boot,
+            meta=meta
+        )
 
-    # map partitions to compute mean & std together
-    bs_stats_dd = ddf.map_partitions(
-        bootstrap_stats_partition,
-        group_size=10,
-        n_boot=100,
-        meta=meta
-    )
+        # compute the combined stats DataFrame
+        bs_stats = bs_stats_dd.compute()
 
-    # compute the combined stats DataFrame
-    bs_stats = bs_stats_dd.compute()
+        # split into two DataFrames: means and stds
+        means = bs_stats.xs('mean', axis=1, level=1).sort_index()
+        stds = bs_stats.xs('std', axis=1, level=1).sort_index()
 
-    # split into two DataFrames: means and stds
-    means = bs_stats.xs('mean', axis=1, level=1).sort_index()
-    stds  = bs_stats.xs('std',  axis=1, level=1).sort_index()
+        bs_estimator[name] = means
+        bs_std_estimator[name] = stds
+    
+    return bs_estimator, bs_std_estimator
 
-    bs_disjoint_estimator[name]     = means
-    bs_disjoint_std_estimator[name] = stds
-
+# Apply bootstrap aggregation to different maxima types
+bs_disjoint_estimator, bs_disjoint_std_estimator = apply_bootstrap_agg(disjoint_maximas, 10)
 print("Bootstrap disjoint estimators computed.")
-# Now `bs_disjoint_estimator` and `bs_disjoint_std_estimator` hold your results per series.
+
+bs_overlapping_estimator, bs_overlapping_std_estimator = apply_bootstrap_agg(overlapping_maximas, 100)
+print("Bootstrap overlapping estimators computed.")
+
+bs_sampled_estimator, bs_sampled_std_estimator = apply_bootstrap_agg(sampled_maximas, 100)
+print("Bootstrap sampled estimators computed.")
 
 # %%
-# Bundle both dicts into one object
+# Bundle all dicts into one object
 estimators = {
     'means': {
         "standard_disjoint_estimator": standard_disjoint_estimator,
-        "bs_disjoint_estimator": bs_disjoint_estimator
+        "bs_disjoint_estimator": bs_disjoint_estimator,
+        "standard_overlapping_estimator": standard_overlapping_estimator,
+        "bs_overlapping_estimator": bs_overlapping_estimator,
+        "standard_sampled_estimator": standard_sampled_estimator,
+        "bs_sampled_estimator": bs_sampled_estimator
     },
     'stds': {
-        "standard_disjoint_estimator": standard_disjoint_std_estimator,
-        "bs_disjoint_estimator": bs_disjoint_std_estimator
+        "standard_disjoint_std_estimator": standard_disjoint_std_estimator,
+        "bs_disjoint_std_estimator": bs_disjoint_std_estimator,
+        "standard_overlapping_std_estimator": standard_overlapping_std_estimator,
+        "bs_overlapping_std_estimator": bs_overlapping_std_estimator,
+        "standard_sampled_std_estimator": standard_sampled_std_estimator,
+        "bs_sampled_std_estimator": bs_sampled_std_estimator
     },
 }
 
@@ -220,21 +246,30 @@ with open('./estimators.pkl', 'wb') as f:
 print("Estimators saved to disk.")
 
 # %%
-# 1) Compute summary stats for each series
-summary_stats = {}
-for name, ddf in disjoint_maximas.items():
-    # ddf.describe() returns a small pandas DataFrame once you compute()
-    summary_stats[name] = (
-        ddf
-        .describe()                   # count, mean, std, min, 25/50/75%, max
-        .compute()                    
-    )
+# Function to compute and store summary stats for a type of maxima
+def compute_summary_stats(maximas_by_type):
+    summary_stats = {}
+    for type_name, maximas_dict in maximas_by_type.items():
+        summary_stats[type_name] = {}
+        for name, ddf in maximas_dict.items():
+            summary_stats[type_name][name] = ddf.describe().compute()
+    return summary_stats
 
-# 2) Pickle the result
-with open('disjoint_maximas_summary.pkl', 'wb') as f:
+# Organize maximas by type
+maximas_by_type = {
+    'disjoint': disjoint_maximas,
+    'overlapping': overlapping_maximas,
+    'sampled': sampled_maximas
+}
+
+# Compute summary stats for all types
+summary_stats = compute_summary_stats(maximas_by_type)
+
+# Pickle the result
+with open('all_maximas_summary.pkl', 'wb') as f:
     pickle.dump(summary_stats, f)
 
-print("Summary stats for disjoint maximas saved to disk.")
+print("Summary stats for all maximas types saved to disk.")
 print("Completed")
 
 # %%
