@@ -72,7 +72,7 @@ def sample_segments_partition(pdf, points_per_series=500, sample_size=100):
         if len(group) >= sample_size:
             return group.sample(n=sample_size, random_state=42)
         else:
-            return group  # or use sampling with replacement if needed
+            return group.sample(n=sample_size, replace=True, random_state=42)  # Sampling with replacement
 
     sampled = pdf.groupby('segment_id').apply(sample_func)
     return sampled.drop(columns='segment_id')
