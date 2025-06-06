@@ -61,7 +61,8 @@ for name in maximas_data.keys():
 overlapping_maximas = {}
 for name in maximas_data.keys():
     sampled = maximas_data[name]["SBM"].map_partitions(sample_every_n, step=points_per_block // 10)
-    overlapping_maximas[name] = sampled
+    # Convert Series to DataFrame with column name "SBM"
+    overlapping_maximas[name] = sampled.to_frame("SBM")
 
 # %%
 def sample_segments_partition(pdf, points_per_series=500, sample_size=100):
@@ -79,12 +80,14 @@ def sample_segments_partition(pdf, points_per_series=500, sample_size=100):
 
 sampled_maximas = {}
 for name in maximas_data.keys():
-    sampled_maximas[name] = maximas_data[name]["SBM"].map_partitions(
+    series = maximas_data[name]["SBM"].map_partitions(
         sample_segments_partition,
         points_per_series=points_per_series,
         sample_size=100,
         meta = maximas_data[name]._meta
     )
+    # Convert Series to DataFrame with column name "SBM"
+    sampled_maximas[name] = series.to_frame("SBM")
 
 # %%
 def agg_within_partition(df, group_size=10):
@@ -104,7 +107,7 @@ def apply_standard_agg(maximas_dict, group_size):
     
     for name, ddf in maximas_dict.items():
         # build a minimal "meta" so Dask knows the output dtypes/columns
-        cols = ddf.columns if hasattr(ddf, 'columns') else pd.Index(['SBM'])
+        cols = ddf.columns
         meta_cols = [f"{c}_mean" for c in cols] + [f"{c}_std" for c in cols]
         meta = pd.DataFrame(columns=meta_cols, dtype=float)
 
@@ -184,7 +187,7 @@ def apply_bootstrap_agg(maximas_dict, group_size, n_boot=100):
     
     for name, ddf in maximas_dict.items():
         # prepare meta with MultiIndex columns [(col, 'mean'), (col, 'std')]
-        cols = ddf.columns if hasattr(ddf, 'columns') else pd.Index(['SBM'])
+        cols = ddf.columns
         mi = pd.MultiIndex.from_product([cols, ['mean', 'std']])
         meta = pd.DataFrame(columns=mi, dtype=float)
 
