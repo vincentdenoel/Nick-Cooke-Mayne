@@ -6,7 +6,7 @@ import dask.dataframe as dd
 import pickle
 import os
 
-data_folder = "./maximas_data"
+data_folder = "./maximas_data_sameSuperblock"
 # data is structured as: f"{name}-{stamp}
 # Get all files in the data folder
 files = os.listdir(data_folder)
@@ -53,14 +53,13 @@ def sample_every_n(df, step):
     return df.iloc[0::step]
 
 for name in maximas_data.keys():
-    sampled = maximas_data[name].map_partitions(sample_every_n, step=points_per_block)
-    disjoint_maximas[name] = sampled
+    disjoint_maximas[name] = maximas_data[name]["SBM"].map_partitions(sample_every_n, step=points_per_block)
 
 
 # %%
 overlapping_maximas = {}
 for name in maximas_data.keys():
-     overlapping_maximas[name] = maximas_data[name][["SBM"]].map_partitions(sample_every_n, step=points_per_block // 10)
+     overlapping_maximas[name] = maximas_data[name].map_partitions(sample_every_n, step=points_per_block // 10)
 
 # %%
 def sample_segments_partition(pdf, points_per_series=500, sample_size=100):
@@ -73,7 +72,7 @@ def sample_segments_partition(pdf, points_per_series=500, sample_size=100):
         else:
             return group.sample(n=sample_size, replace=True, random_state=42)  # Sampling with replacement
 
-    sampled = pdf.groupby('segment_id').apply(sample_func)
+    sampled = pdf.groupby('segment_id').apply(sample_func, include_groups=False)
     return sampled.drop(columns='segment_id')
 
 sampled_maximas = {}
@@ -84,6 +83,8 @@ for name in maximas_data.keys():
         sample_size=100,
         meta = maximas_data[name][["SBM"]]._meta
     )
+
+print("Lazy maxima dicts created")
 
 # %%
 def agg_within_partition(df, group_size=10):
@@ -135,7 +136,7 @@ standard_disjoint_estimator, standard_disjoint_std_estimator = apply_standard_ag
 print("Standard disjoint estimators computed.")
 
 # %%
-def bootstrap_stats_partition(df, group_size=10, n_boot=100):
+def bootstrap_stats_partition(df, group_size=10, n_boot=1000, block_size=1):
     """
     Compute bootstrap mean and std for each column in partitioned DataFrame.
 
@@ -155,19 +156,33 @@ def bootstrap_stats_partition(df, group_size=10, n_boot=100):
     for grp, sub in df.groupby(grp_idx):
         stats = {}
         for col in sub.columns:
+            if col == 'SBM': # Handle SBM where block_size is always 1
+                group_size *= block_size
+                block_size == 1
+            
             vals = sub[col].values
-            # bootstrap resamples
+    
+            # Reshape vals into a 2D array with block_size column
+            n_rows = len(vals) // block_size
+    
+            # Truncate vals to fit evenly into blocks
+            vals_2d = vals[:n_rows * block_size].reshape(n_rows, block_size)
+    
+            # bootstrap resamples with block sampling
             bs_means = np.array([
-                np.random.choice(vals, size=len(vals), replace=True).mean()
+                # Sample entire rows (blocks) with replacement
+                vals_2d[np.random.choice(n_rows, size=n_rows, replace=True)].flatten().mean()
                 for _ in range(n_boot)
             ])
             bs_stds = np.array([
-                np.std(np.random.choice(vals, size=len(vals), replace=True), ddof=1)
+                # Sample entire rows (blocks) with replacement
+                np.std(vals_2d[np.random.choice(n_rows, size=n_rows, replace=True)].flatten(), ddof=1)
                 for _ in range(n_boot)
             ])
+    
             # average of bootstrap replications
             stats[(col, 'mean')] = bs_means.mean()
-            stats[(col, 'std')]  = bs_stds.mean()
+            stats[(col, 'std')] = bs_stds.mean()
         # series named by group index
         rec = pd.Series(stats, name=grp)
         records.append(rec)
@@ -177,7 +192,7 @@ def bootstrap_stats_partition(df, group_size=10, n_boot=100):
     return out
 
 # Function to apply bootstrap aggregation to any maxima type
-def apply_bootstrap_agg(maximas_dict, group_size, n_boot=100):
+def apply_bootstrap_agg(maximas_dict, group_size=10, n_boot=1000, block_size=1):
     bs_estimator = {}
     bs_std_estimator = {}
     
@@ -208,13 +223,13 @@ def apply_bootstrap_agg(maximas_dict, group_size, n_boot=100):
     return bs_estimator, bs_std_estimator
 
 # Apply bootstrap aggregation to different maxima types
-bs_overlapping_estimator, bs_overlapping_std_estimator = apply_bootstrap_agg(overlapping_maximas, 100)
+bs_overlapping_estimator, bs_overlapping_std_estimator = apply_bootstrap_agg(overlapping_maximas, group_size=100, n_boot = 100, block_size=10)
 print("Bootstrap overlapping estimators computed.")
 
-bs_sampled_estimator, bs_sampled_std_estimator = apply_bootstrap_agg(sampled_maximas, 100)
+bs_sampled_estimator, bs_sampled_std_estimator = apply_bootstrap_agg(sampled_maximas, group_size=100)
 print("Bootstrap sampled estimators computed.")
 
-bs_disjoint_estimator, bs_disjoint_std_estimator = apply_bootstrap_agg(disjoint_maximas, 10)
+bs_disjoint_estimator, bs_disjoint_std_estimator = apply_bootstrap_agg(disjoint_maximas, group_size=10)
 print("Bootstrap disjoint estimators computed.")
 
 # %%
