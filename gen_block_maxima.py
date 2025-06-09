@@ -7,7 +7,7 @@ import nicks_functions as nf
 
 import time
 
-def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4], unique_stamp=None):
+def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 5], unique_stamp=None, match_supeblock=True):
     """
     Generate block maxima for different series and save them to parquet files.
     
@@ -57,7 +57,10 @@ def gen_block_maxima(n_blocks=10, series_types=[0, 1, 2, 3], k_blocks=[0, 2, 4],
                     if k_block == 0:
                         maximas[f"series{i}"][f"SBM"].append(nf.sample_blocks(x, len(x)//n_blocks, random=False, circular=True, step = 1, func=block_max))
                     else:
-                        r = int(len(x)/n_blocks/k_block)
+                        if match_supeblock:
+                            r = int(len(x)/n_blocks/k_block)
+                        else:
+                            r = int(len(x)/n_blocks)
                         maximas[f"series{i}"][f"CBM_k{k_block}"].append(nf.CBM(x, r, k = k_block, circular=False, step = 1).flatten())
         
             # Save data every saveStep iterations
@@ -104,9 +107,9 @@ def main():
     n_blocks = 10  # Number of blocks
     series_types = [args.series_type] if args.series_type is not None else [0, 1]
     unique_stamp = args.unique_stamp if args.unique_stamp is not None else None
-    k_blocks = [0, 2, 4]
+    k_blocks = [0, 2, 5]
     print(f"series_types: {series_types}, k_blocks: {k_blocks}")
-    gen_block_maxima(n_blocks, series_types=series_types, k_blocks=k_blocks, unique_stamp=unique_stamp)
+    gen_block_maxima(n_blocks, series_types=series_types, k_blocks=k_blocks, unique_stamp=unique_stamp, match_supeblock=False)
 
 if __name__ == "__main__":
     main()
