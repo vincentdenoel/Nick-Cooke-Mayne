@@ -60,9 +60,7 @@ for name in maximas_data.keys():
 # %%
 overlapping_maximas = {}
 for name in maximas_data.keys():
-    sampled = maximas_data[name]["SBM"].map_partitions(sample_every_n, step=points_per_block // 10)
-    # Convert Series to DataFrame with column name "SBM"
-    overlapping_maximas[name] = sampled.to_frame("SBM")
+     overlapping_maximas[name] = maximas_data[name][["SBM"]].map_partitions(sample_every_n, step=points_per_block // 10)
 
 # %%
 def sample_segments_partition(pdf, points_per_series=500, sample_size=100):
@@ -80,14 +78,12 @@ def sample_segments_partition(pdf, points_per_series=500, sample_size=100):
 
 sampled_maximas = {}
 for name in maximas_data.keys():
-    series = maximas_data[name]["SBM"].map_partitions(
+    sampled_maximas[name] = maximas_data[name][["SBM"]].map_partitions(
         sample_segments_partition,
         points_per_series=points_per_series,
         sample_size=100,
-        meta = maximas_data[name]._meta
+        meta = maximas_data[name][["SBM"]]._meta
     )
-    # Convert Series to DataFrame with column name "SBM"
-    sampled_maximas[name] = series.to_frame("SBM")
 
 # %%
 def agg_within_partition(df, group_size=10):
@@ -129,14 +125,14 @@ def apply_standard_agg(maximas_dict, group_size):
     return estimator, std_estimator
 
 # Apply standard aggregation to different maxima types
-standard_disjoint_estimator, standard_disjoint_std_estimator = apply_standard_agg(disjoint_maximas, 10)
-print("Standard disjoint estimators computed.")
-
 standard_overlapping_estimator, standard_overlapping_std_estimator = apply_standard_agg(overlapping_maximas, 100)
 print("Standard overlapping estimators computed.")
 
 standard_sampled_estimator, standard_sampled_std_estimator = apply_standard_agg(sampled_maximas, 100)
 print("Standard sampled estimators computed.")
+
+standard_disjoint_estimator, standard_disjoint_std_estimator = apply_standard_agg(disjoint_maximas, 10)
+print("Standard disjoint estimators computed.")
 
 # %%
 def bootstrap_stats_partition(df, group_size=10, n_boot=100):
@@ -212,14 +208,14 @@ def apply_bootstrap_agg(maximas_dict, group_size, n_boot=100):
     return bs_estimator, bs_std_estimator
 
 # Apply bootstrap aggregation to different maxima types
-bs_disjoint_estimator, bs_disjoint_std_estimator = apply_bootstrap_agg(disjoint_maximas, 10)
-print("Bootstrap disjoint estimators computed.")
-
 bs_overlapping_estimator, bs_overlapping_std_estimator = apply_bootstrap_agg(overlapping_maximas, 100)
 print("Bootstrap overlapping estimators computed.")
 
 bs_sampled_estimator, bs_sampled_std_estimator = apply_bootstrap_agg(sampled_maximas, 100)
 print("Bootstrap sampled estimators computed.")
+
+bs_disjoint_estimator, bs_disjoint_std_estimator = apply_bootstrap_agg(disjoint_maximas, 10)
+print("Bootstrap disjoint estimators computed.")
 
 # %%
 # Bundle all dicts into one object
