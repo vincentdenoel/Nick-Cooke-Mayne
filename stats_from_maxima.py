@@ -53,7 +53,7 @@ def sample_every_n(df, step):
     return df.iloc[0::step]
 
 for name in maximas_data.keys():
-    disjoint_maximas[name] = maximas_data[name]["SBM"].map_partitions(sample_every_n, step=points_per_block)
+    disjoint_maximas[name] = maximas_data[name][["SBM"]].map_partitions(sample_every_n, step=points_per_block)
 
 
 # %%
@@ -73,7 +73,7 @@ def sample_segments_partition(pdf, points_per_series=500, sample_size=100):
             return group.sample(n=sample_size, replace=True, random_state=42)  # Sampling with replacement
 
     sampled = pdf.groupby('segment_id').apply(sample_func, include_groups=False)
-    return sampled.drop(columns='segment_id')
+    return sampled
 
 sampled_maximas = {}
 for name in maximas_data.keys():
@@ -126,14 +126,14 @@ def apply_standard_agg(maximas_dict, group_size):
     return estimator, std_estimator
 
 # Apply standard aggregation to different maxima types
+standard_disjoint_estimator, standard_disjoint_std_estimator = apply_standard_agg(disjoint_maximas, 10)
+print("Standard disjoint estimators computed.")
+
 standard_overlapping_estimator, standard_overlapping_std_estimator = apply_standard_agg(overlapping_maximas, 100)
 print("Standard overlapping estimators computed.")
 
 standard_sampled_estimator, standard_sampled_std_estimator = apply_standard_agg(sampled_maximas, 100)
 print("Standard sampled estimators computed.")
-
-standard_disjoint_estimator, standard_disjoint_std_estimator = apply_standard_agg(disjoint_maximas, 10)
-print("Standard disjoint estimators computed.")
 
 # %%
 def bootstrap_stats_partition(df, group_size=10, n_boot=1000, block_size=1):
@@ -223,11 +223,11 @@ def apply_bootstrap_agg(maximas_dict, group_size=10, n_boot=1000, block_size=1):
     return bs_estimator, bs_std_estimator
 
 # Apply bootstrap aggregation to different maxima types
-bs_overlapping_estimator, bs_overlapping_std_estimator = apply_bootstrap_agg(overlapping_maximas, group_size=100, n_boot = 100, block_size=10)
-print("Bootstrap overlapping estimators computed.")
-
 bs_sampled_estimator, bs_sampled_std_estimator = apply_bootstrap_agg(sampled_maximas, group_size=100)
 print("Bootstrap sampled estimators computed.")
+
+bs_overlapping_estimator, bs_overlapping_std_estimator = apply_bootstrap_agg(overlapping_maximas, group_size=100, n_boot = 100, block_size=10)
+print("Bootstrap overlapping estimators computed.")
 
 bs_disjoint_estimator, bs_disjoint_std_estimator = apply_bootstrap_agg(disjoint_maximas, group_size=10)
 print("Bootstrap disjoint estimators computed.")
