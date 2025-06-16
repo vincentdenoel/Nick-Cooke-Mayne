@@ -6,7 +6,7 @@ import dask.dataframe as dd
 import pickle
 import os
 
-data_folder = "./maximas_data_sameSuperblock"
+data_folder = "./maximas_data"
 # data is structured as: f"{name}-{stamp}
 # Get all files in the data folder
 files = os.listdir(data_folder)
