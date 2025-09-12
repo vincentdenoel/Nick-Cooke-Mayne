@@ -5,6 +5,7 @@ import pandas as pd
 import dask.dataframe as dd
 import pickle
 import os
+import scipy
 
 data_folder = "./maximas_data"
 # data is structured as: f"{name}-{stamp}
@@ -140,12 +141,36 @@ def apply_standard_agg(maximas_dict, group_size):
 # Apply standard aggregation to different maxima types
 standard_disjoint_estimator, standard_disjoint_std_estimator, standard_disjoint_skew_estimator, standard_disjoint_kurt_estimator = apply_standard_agg(disjoint_maximas, 10)
 print("Standard disjoint estimators computed.")
+standard_disjoint_estimators = {
+    "standard_disjoint_estimator": standard_disjoint_estimator,
+    "standard_disjoint_std_estimator": standard_disjoint_std_estimator,
+    "standard_disjoint_skew_estimator": standard_disjoint_skew_estimator,
+    "standard_disjoint_kurt_estimator": standard_disjoint_kurt_estimator
+}
+with open('./standard_disjoint_estimators.pkl', 'wb') as f:
+    pickle.dump(standard_disjoint_estimators, f)
 
 standard_overlapping_estimator, standard_overlapping_std_estimator, standard_overlapping_skew_estimator, standard_overlapping_kurt_estimator = apply_standard_agg(overlapping_maximas, 100)
 print("Standard overlapping estimators computed.")
+standard_overlapping_estimators = {
+    "standard_overlapping_estimator": standard_overlapping_estimator,
+    "standard_overlapping_std_estimator": standard_overlapping_std_estimator,
+    "standard_overlapping_skew_estimator": standard_overlapping_skew_estimator,
+    "standard_overlapping_kurt_estimator": standard_overlapping_kurt_estimator
+}
+with open('./standard_overlapping_estimators.pkl', 'wb') as f:
+    pickle.dump(standard_overlapping_estimators, f)
 
 standard_sampled_estimator, standard_sampled_std_estimator, standard_sampled_skew_estimator, standard_sampled_kurt_estimator = apply_standard_agg(sampled_maximas, 100)
 print("Standard sampled estimators computed.")
+standard_sampled_estimators = {
+    "standard_sampled_estimator": standard_sampled_estimator,
+    "standard_sampled_std_estimator": standard_sampled_std_estimator,
+    "standard_sampled_skew_estimator": standard_sampled_skew_estimator,
+    "standard_sampled_kurt_estimator": standard_sampled_kurt_estimator
+}
+with open('./standard_sampled_estimators.pkl', 'wb') as f:
+    pickle.dump(standard_sampled_estimators, f)
 
 # %%
 def bootstrap_stats_partition(df, group_size=10, n_boot=1000, block_size=1):
@@ -256,55 +281,79 @@ def apply_bootstrap_agg(maximas_dict, group_size=10, n_boot=1000, block_size=1):
 # Apply bootstrap aggregation to different maxima types
 bs_sampled_estimator, bs_sampled_std_estimator, bs_sampled_skew_estimator, bs_sampled_kurt_estimator = apply_bootstrap_agg(sampled_maximas, group_size=100)
 print("Bootstrap sampled estimators computed.")
+bs_sampled_estimators = {
+    "bs_sampled_estimator": bs_sampled_estimator,
+    "bs_sampled_std_estimator": bs_sampled_std_estimator,
+    "bs_sampled_skew_estimator": bs_sampled_skew_estimator,
+    "bs_sampled_kurt_estimator": bs_sampled_kurt_estimator
+}
+with open('./bs_sampled_estimators.pkl', 'wb') as f:
+    pickle.dump(bs_sampled_estimators, f)
 
 bs_overlapping_estimator, bs_overlapping_std_estimator, bs_overlapping_skew_estimator, bs_overlapping_kurt_estimator = apply_bootstrap_agg(overlapping_maximas, group_size=100, n_boot=100, block_size=10)
 print("Bootstrap overlapping estimators computed.")
+bs_overlapping_estimators = {
+    "bs_overlapping_estimator": bs_overlapping_estimator,
+    "bs_overlapping_std_estimator": bs_overlapping_std_estimator,
+    "bs_overlapping_skew_estimator": bs_overlapping_skew_estimator,
+    "bs_overlapping_kurt_estimator": bs_overlapping_kurt_estimator
+}
+with open('./bs_overlapping_estimators.pkl', 'wb') as f:
+    pickle.dump(bs_overlapping_estimators, f)
 
 bs_disjoint_estimator, bs_disjoint_std_estimator, bs_disjoint_skew_estimator, bs_disjoint_kurt_estimator = apply_bootstrap_agg(disjoint_maximas, group_size=10)
 print("Bootstrap disjoint estimators computed.")
-
-# %%
-# Bundle all dicts into one object
-estimators = {
-    'means': {
-        "standard_disjoint_estimator": standard_disjoint_estimator,
-        "bs_disjoint_estimator": bs_disjoint_estimator,
-        "standard_overlapping_estimator": standard_overlapping_estimator,
-        "bs_overlapping_estimator": bs_overlapping_estimator,
-        "standard_sampled_estimator": standard_sampled_estimator,
-        "bs_sampled_estimator": bs_sampled_estimator
-    },
-    'stds': {
-        "standard_disjoint_std_estimator": standard_disjoint_std_estimator,
-        "bs_disjoint_std_estimator": bs_disjoint_std_estimator,
-        "standard_overlapping_std_estimator": standard_overlapping_std_estimator,
-        "bs_overlapping_std_estimator": bs_overlapping_std_estimator,
-        "standard_sampled_std_estimator": standard_sampled_std_estimator,
-        "bs_sampled_std_estimator": bs_sampled_std_estimator
-    },
-    'skews': {
-        "standard_disjoint_skew_estimator": standard_disjoint_skew_estimator,
-        "bs_disjoint_skew_estimator": bs_disjoint_skew_estimator,
-        "standard_overlapping_skew_estimator": standard_overlapping_skew_estimator,
-        "bs_overlapping_skew_estimator": bs_overlapping_skew_estimator,
-        "standard_sampled_skew_estimator": standard_sampled_skew_estimator,
-        "bs_sampled_skew_estimator": bs_sampled_skew_estimator
-    },
-    'kurts': {
-        "standard_disjoint_kurt_estimator": standard_disjoint_kurt_estimator,
-        "bs_disjoint_kurt_estimator": bs_disjoint_kurt_estimator,
-        "standard_overlapping_kurt_estimator": standard_overlapping_kurt_estimator,
-        "bs_overlapping_kurt_estimator": bs_overlapping_kurt_estimator,
-        "standard_sampled_kurt_estimator": standard_sampled_kurt_estimator,
-        "bs_sampled_kurt_estimator": bs_sampled_kurt_estimator
-    }
+bs_disjoint_estimators = {
+    "bs_disjoint_estimator": bs_disjoint_estimator,
+    "bs_disjoint_std_estimator": bs_disjoint_std_estimator,
+    "bs_disjoint_skew_estimator": bs_disjoint_skew_estimator,
+    "bs_disjoint_kurt_estimator": bs_disjoint_kurt_estimator
 }
+with open('./bs_disjoint_estimators.pkl', 'wb') as f:
+    pickle.dump(bs_disjoint_estimators, f)
 
-# Write to disk
-with open('./estimators.pkl', 'wb') as f:
-    pickle.dump(estimators, f)
+# # %%
+# # Bundle all dicts into one object
+# estimators = {
+#     'means': {
+#         "standard_disjoint_estimator": standard_disjoint_estimator,
+#         "bs_disjoint_estimator": bs_disjoint_estimator,
+#         "standard_overlapping_estimator": standard_overlapping_estimator,
+#         "bs_overlapping_estimator": bs_overlapping_estimator,
+#         "standard_sampled_estimator": standard_sampled_estimator,
+#         "bs_sampled_estimator": bs_sampled_estimator
+#     },
+#     'stds': {
+#         "standard_disjoint_std_estimator": standard_disjoint_std_estimator,
+#         "bs_disjoint_std_estimator": bs_disjoint_std_estimator,
+#         "standard_overlapping_std_estimator": standard_overlapping_std_estimator,
+#         "bs_overlapping_std_estimator": bs_overlapping_std_estimator,
+#         "standard_sampled_std_estimator": standard_sampled_std_estimator,
+#         "bs_sampled_std_estimator": bs_sampled_std_estimator
+#     },
+#     'skews': {
+#         "standard_disjoint_skew_estimator": standard_disjoint_skew_estimator,
+#         "bs_disjoint_skew_estimator": bs_disjoint_skew_estimator,
+#         "standard_overlapping_skew_estimator": standard_overlapping_skew_estimator,
+#         "bs_overlapping_skew_estimator": bs_overlapping_skew_estimator,
+#         "standard_sampled_skew_estimator": standard_sampled_skew_estimator,
+#         "bs_sampled_skew_estimator": bs_sampled_skew_estimator
+#     },
+#     'kurts': {
+#         "standard_disjoint_kurt_estimator": standard_disjoint_kurt_estimator,
+#         "bs_disjoint_kurt_estimator": bs_disjoint_kurt_estimator,
+#         "standard_overlapping_kurt_estimator": standard_overlapping_kurt_estimator,
+#         "bs_overlapping_kurt_estimator": bs_overlapping_kurt_estimator,
+#         "standard_sampled_kurt_estimator": standard_sampled_kurt_estimator,
+#         "bs_sampled_kurt_estimator": bs_sampled_kurt_estimator
+#     }
+# }
 
-print("Estimators saved to disk.")
+# # Write to disk
+# with open('./estimators.pkl', 'wb') as f:
+#     pickle.dump(estimators, f)
+
+# print("Estimators saved to disk.")
 
 # %%
 # Function to compute and store summary stats for a type of maxima
