@@ -362,7 +362,14 @@ def compute_summary_stats(maximas_by_type):
     for type_name, maximas_dict in maximas_by_type.items():
         summary_stats[type_name] = {}
         for name, ddf in maximas_dict.items():
-            summary_stats[type_name][name] = ddf.describe().compute()
+            desc = ddf.describe().compute()
+            skewness = ddf.skew().compute()
+            kurtosis = ddf.kurtosis().compute()
+            summary_stats[type_name][name] = {
+                'describe': desc,
+                'skewness': skewness,
+                'kurtosis': kurtosis
+            }
     return summary_stats
 
 # Organize maximas by type

@@ -7,6 +7,7 @@
 #SBATCH --partition=serc
 #SBATCH --mail-type=ALL
 #SBATCH --output=stats.out
+#SBATCH --constraint=CLASS:SH4_CPERF
 
 # # Set OpenMP environment variables
 # export OMP_NUM_THREADS=1
